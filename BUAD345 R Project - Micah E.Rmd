@@ -1,0 +1,284 @@
+---
+title: "BUAD345 R Project - Micah E"
+output: html_notebook
+---
+
+Execute by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+```{r}
+## Check the working directory
+getwd()
+```
+```{r}
+## Import the data
+df=read.csv("ScreenTime vs MentalWellness.csv")
+View(df)
+```
+
+
+```{r}
+summary(df)
+```
+```{r}
+## See the types of data in each column
+str(df)
+```
+```{r}
+colSums(is.na(df))
+```
+```{r}
+## The column X has no important values. Therefore, it should be dropped.
+df$X <- NULL
+df
+```
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+
+```{r}
+## What is the average screen time for each working mode in total, while at work, and while not at work
+
+df %>% select(occupation,work_mode,screen_time_hours,work_screen_hours,leisure_screen_hours) %>% filter(occupation=="Employed") %>% group_by(work_mode) %>% summarize(avg_screen_time=mean(screen_time_hours,na.rm=TRUE),avg_work_screen_time=mean(work_screen_hours,na.rm=TRUE), avg_leisure_screen_time=mean(leisure_screen_hours,na.rm=TRUE))
+```
+
+
+```{r}
+## Is there relation to sleep quality, screen time, and stress level?
+
+df %>% select(sleep_quality_1_5, screen_time_hours, stress_level_0_10) %>% group_by(sleep_quality_1_5) %>% summarize(avg_screen_time=mean(screen_time_hours),avg_stress_level=mean(stress_level_0_10))
+```
+
+
+```{r}
+## Get the breakdown of the range of numbers for screen time hours
+summary(df$screen_time_hours)
+```
+
+
+```{r}
+## Add a new grouped by screen time column that makes bins for screen time instead of various numbers with decimals.
+
+df = mutate(df,screen_time_hours,screen_time_grouped= cut(screen_time_hours, 
+                                                     breaks = c(-Inf,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,Inf),
+                                                     labels=c("0-1","1-2","2-3","3-4","4-5","5-6","6-7","7-8","8-9","9-10","10-11","11-12","12-13","13-14","14-15","15-16","16+"),
+                                                     right=FALSE))
+```
+
+
+```{r}
+## Visualize the distribution of exercise minutes per week
+plot(df$exercise_minutes_per_week)
+```
+
+
+```{r}
+## Add a new grouped by exercise time column that makes bins for exercise minutes instead of various numbers with decimals.
+
+df = mutate(df,exercise_minutes_per_week,weekly_exercise_grouped= cut(exercise_minutes_per_week, 
+                                                     breaks = c(-Inf,25,50,75,100,125,150,175,200,225,250,275,300,325,350,Inf),
+                                                     labels=c("0-25","25-50","50-75","75-100","100-125","125-150","150-175","175-200","200-225","225-250","250-275","275-300","300-325","325-350","350+"),
+                                                     right=FALSE))
+
+plot(df$weekly_exercise_grouped)
+```
+
+
+```{r}
+## What is the maximum and minimum for the mental wellness based off screentime. Is there a
+subset1 = df %>% 
+  select(screen_time_grouped, mental_wellness_index_0_100) %>% 
+  group_by(screen_time_grouped) %>% 
+  summarize(Mental_Wellness_Max=max(mental_wellness_index_0_100),Mental_Wellness_Min=min(mental_wellness_index_0_100), Mental_Wellness_Avg=mean(mental_wellness_index_0_100))    
+
+subset1
+```
+
+
+```{r}
+## Because the data is confusing, it is more helpful to view it as a graph.
+
+subset2= df %>% 
+  select(screen_time_grouped,mental_wellness_index_0_100)
+subset2
+
+
+ggplot(subset2, aes(x = screen_time_grouped, y = mental_wellness_index_0_100)) +
+  geom_boxplot(fill = "lightgreen", color = "darkgreen") +
+  labs(title = "Boxplot of Mental Wellness Index by Screen Time",
+       x = "Screen Time",
+       y = "Mental Wellness Ranking")
+```
+
+
+```{r}
+## What is relationship between screentime and productivity? 
+
+ggplot(df, aes(x = screen_time_grouped, y = productivity_0_100)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue") +
+  labs(title = "Boxplot of Productivity Index by Screen Time",
+       x = "Screen Time",
+       y = "Productivity Ranking")
+
+```
+```{r}
+## Correlation Matrix to view how the different values relate to each other.
+## Install the correlation matrix
+install.packages("corrplot")
+library(corrplot)
+```
+
+
+```{r}
+## create a new subset with the values to be compared
+subset3 = df %>% select(age,screen_time_hours,sleep_quality_1_5,stress_level_0_10,productivity_0_100,exercise_minutes_per_week,social_hours_per_week,mental_wellness_index_0_100)
+
+subset3
+```
+```{r}
+## Create a correlation matrix to see how directly the values are related to each other
+matrix1 = cor(subset3)
+corrplot(matrix1, method = "color", addCoef.col = "black", tl.cex = 0.45)
+```
+## Age, exercise minutes per week, and social hours per week don't seem to be strongly correlated with other factors
+## screen time, sleep quality, stress level, productivity, and mental wellness index have high correlations.
+
+```{r}
+## Based off the correlation matrix, how does leisure or work screen time relate to stress, productivity and mental wellness?
+## This is stress
+
+subset4 = df %>% select(screen_time_hours,work_screen_hours,leisure_screen_hours,stress_level_0_10,productivity_0_100,mental_wellness_index_0_100) %>% mutate(stress_level_floor = floor(stress_level_0_10))%>% group_by(stress_level_floor) %>%summarize(worktime=mean(work_screen_hours),leisuretime=mean(leisure_screen_hours))
+
+library(tidyr)
+subset4_long <- subset4 %>%
+  pivot_longer(cols = c(worktime, leisuretime),
+               names_to = "category",
+               values_to = "avg_time")
+
+
+ggplot(subset4_long, aes(x = stress_level_floor, y = avg_time, fill = category)) +
+  geom_bar(stat = "identity",position='dodge') +
+  labs(title = "Stacked Work vs Leisure Screen Time by Stress Level",
+       x = "Stress Level (floored)",
+       y = "Average Screen Time (hours)") +
+  scale_fill_manual(values = c("worktime" = "lightblue4", "leisuretime" = "darkseagreen3")) +
+  scale_x_continuous(breaks = seq(0, 10, by = 1)) +
+  theme_minimal()
+```
+
+
+
+```{r}
+## How do the types of screentime relate to productivity?
+subset5 = df %>% mutate(productivity_floor = (floor(productivity_0_100/10))*10)%>% group_by(productivity_floor) %>%summarize(worktime=mean(work_screen_hours),leisuretime=mean(leisure_screen_hours))
+
+
+library(tidyr)
+subset5_long <- subset5 %>%
+  pivot_longer(cols = c(worktime, leisuretime),
+               names_to = "category",
+               values_to = "avg_time")
+
+
+ggplot(subset5_long, aes(x = productivity_floor, y = avg_time, fill = category)) +
+  geom_bar(stat = "identity",position='dodge') +
+  labs(title = "Stacked Work vs Leisure Screen Time by Productivity",
+       x = "Productivity (floored)",
+       y = "Average Screen Time (hours)") +
+  scale_fill_manual(values = c("worktime" = "lightblue4", "leisuretime" = "darkseagreen3"))+
+  scale_x_continuous(breaks = seq(0, 100, by = 10))+
+  theme_minimal()
+```
+
+
+```{r}
+## How do the types of screentime relate to mental wellness?
+subset6 = df %>% mutate(mwellness_floor = (floor(mental_wellness_index_0_100/10))*10)%>% group_by(mwellness_floor) %>%summarize(worktime=mean(work_screen_hours),leisuretime=mean(leisure_screen_hours))
+
+
+library(tidyr)
+subset6_long <- subset6 %>%
+  pivot_longer(cols = c(worktime, leisuretime),
+               names_to = "category",
+               values_to = "avg_time")
+
+
+ggplot(subset6_long, aes(x = mwellness_floor, y = avg_time, fill = category)) +
+  geom_bar(stat = "identity",position='dodge') +
+  labs(title = "Stacked Work vs Leisure Screen Time by Mental Wellness",
+       x = "Productivity (floored)",
+       y = "Average Screen Time (hours)") +
+  scale_fill_manual(values = c("worktime" = "lightblue4", "leisuretime" = "darkseagreen3"))+
+  scale_x_continuous(breaks = seq(0, 100, by = 10))+
+  theme_minimal()
+```
+
+
+```{r}
+## does exercise time or sleep time better predict mental wellness index?
+
+## Make a subset that breaks down mental wellness by 10s and gets the means for exercise time and sleep time for each group
+subset7=df %>% mutate(mental_wellness_floor = floor(mental_wellness_index_0_100/10)*10)%>% group_by(mental_wellness_floor) %>%summarize(exercise_time_mean=mean(exercise_minutes_per_week),sleep_time_mean=mean(sleep_hours))
+subset7
+
+exmax=max(subset7$exercise_time_mean)
+## get the max and divide it by 
+subset8 = subset7 %>% mutate(exercise_pct = round(exercise_time_mean/max(exercise_time_mean)*100,2),sleep_pct= round(sleep_time_mean/max(sleep_time_mean)*100,2))
+subset8
+```
+```{r}
+## Graph the pct vs mental wellness
+
+subset8_long <- subset8 %>%
+  pivot_longer(cols = c(exercise_pct, sleep_pct),
+               names_to = "category",
+               values_to = "mental_wellness")
+
+
+ggplot(subset8_long, aes(x = mental_wellness_floor, y = mental_wellness, fill = category)) +
+  geom_bar(stat = "identity",position='dodge') +
+  labs(title = "Growth of Sleep and Exercise By Mental Wellness (Compared To Their Max)",
+       x = "Mental Wellness (floored)",
+       y = "Time Spent Percentage Compared to Max (hours)") +
+  scale_fill_manual(values = c("exercise_pct" = "lightblue3", "sleep_pct" = "lightpink4"))+
+  scale_x_continuous(breaks = seq(0, 100, by = 10))+
+  theme_minimal()
+```
+
+```{r}
+
+```
+
+
+```{r}
+## Sleep Amount vs Sleep Quality compared to mental wellness
+subset9=df %>% mutate(mental_wellness_floor = floor(mental_wellness_index_0_100/10)*10)%>% group_by(mental_wellness_floor) %>%summarize(sleep_quality_mean=round(mean(sleep_quality_1_5),2),sleep_time_mean= round(mean(sleep_hours),2))
+subset9
+
+## get the max and divide it by 
+subset10 = subset9 %>% mutate(squality_pct = round(sleep_quality_mean/max(sleep_quality_mean)*100,2),sleep_pct= round(sleep_time_mean/max(sleep_time_mean)*100,2))
+subset10
+```
+
+```{r}
+## Graph quality and amount compared to mental wellness
+subset10_long <- subset10 %>%
+  pivot_longer(cols = c(squality_pct, sleep_pct),
+               names_to = "category",
+               values_to = "mental_wellness")
+
+
+ggplot(subset10_long, aes(x = mental_wellness_floor, y = mental_wellness, fill = category)) +
+  geom_bar(stat = "identity",position='dodge') +
+  labs(title = "Growth of Sleep and Sleep Quality By Mental Wellness (Compared To Their Max)",
+       x = "Mental Wellness (floored)",
+       y = "Category Percentage Compared to Max (hours)") +
+  scale_fill_manual(values = c("squality_pct" ="green4", "sleep_pct" = "lightblue4"))+
+  scale_x_continuous(breaks = seq(0, 100, by = 10))+
+  theme_minimal()
+```
+
