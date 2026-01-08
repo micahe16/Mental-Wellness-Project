@@ -3,9 +3,6 @@ title: "BUAD345 R Project - Micah E"
 output: html_notebook
 ---
 
-Execute by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
-
 ```{r}
 ## Check the working directory
 getwd()
@@ -281,4 +278,5 @@ ggplot(subset10_long, aes(x = mental_wellness_floor, y = mental_wellness, fill =
   scale_x_continuous(breaks = seq(0, 100, by = 10))+
   theme_minimal()
 ```
+
 
